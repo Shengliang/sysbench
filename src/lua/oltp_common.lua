@@ -18,6 +18,27 @@
 -- Common code for OLTP benchmarks.
 -- -----------------------------------------------------------------------------
 
+event_cnt = {}
+sleep_vec = {}
+
+local clock = os.clock
+function mysleep(n)  -- seconds
+  local t0 = clock()
+  while clock() - t0 <= n do end
+end
+
+function sleep_if_throttle()
+   my_thread_id = sysbench.tid % sysbench.opt.threads
+   cnt = event_cnt[my_thread_id]
+   cnt = cnt + 1
+   event_cnt[my_thread_id] = cnt
+   if sleep_vec[my_thread_id][cnt%1000] == 1 then
+       -- print("S", cnt%1000);
+       mysleep(1);
+   end
+   -- print("event thread_id:", my_thread_id,  " event cnt:", event_cnt[my_thread_id])
+end
+
 function init()
    assert(event ~= nil,
           "this script is meant to be included by other OLTP scripts and " ..
@@ -31,6 +52,8 @@ end
 
 -- Command line options
 sysbench.cmdline.options = {
+   qps_weight  =
+      {"Weight of QPS workload [1-100]", 100},
    table_size =
       {"Number of rows per table", 10000},
    range_size =
@@ -360,6 +383,23 @@ function thread_init()
    -- of connection/table/query
    stmt = {}
    param = {}
+
+   math.randomseed(os.time())
+   math.random(); math.random(); math.random()
+
+   my_thread_id = sysbench.tid % sysbench.opt.threads
+   event_cnt[my_thread_id] = 0
+   sleep_vec[my_thread_id] = {}
+   for i = 0,999 do
+      local r = math.random(1,100)
+      local v = 1
+      if r <= sysbench.opt.qps_weight then
+          v = 0
+      end
+      sleep_vec[my_thread_id][i] = v
+   end
+   my_sleep_map = sleep_vec[my_thread_id]
+   print("thread init:", my_thread_id, " weight:", sysbench.opt.qps_weight, "ops_weight_vec:", table.concat(my_sleep_map, ", "))
 
    for t = 1, sysbench.opt.tables do
       stmt[t] = {}
