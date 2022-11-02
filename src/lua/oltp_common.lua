@@ -21,11 +21,29 @@
 event_cnt = {}
 sleep_vec = {}
 
-local clock = os.clock
-function mysleep(n)  -- seconds
-  local t0 = clock()
-  while clock() - t0 <= n do end
+function mysleep(n)  -- in 15ms
+  local wtime = sysbench.opt.sleep_window_in_ms
+  local ntime = os.clock() + n*wtime/1000
+  repeat until os.clock() > ntime
 end
+
+function init_throttle()
+   math.randomseed(os.time())
+   math.random(); math.random(); math.random()
+   my_thread_id = sysbench.tid % sysbench.opt.threads
+   event_cnt[my_thread_id] = 0
+   sleep_vec[my_thread_id] = {}
+   for i = 0,999 do
+      local r = math.random(1,100)
+      local v = 1
+      if r <= sysbench.opt.qps_weight then
+          v = 0
+      end
+      sleep_vec[my_thread_id][i] = v
+   end
+   my_sleep_map = sleep_vec[my_thread_id]
+   print("thread init:", my_thread_id, " weight:", sysbench.opt.qps_weight, "ops_weight_vec:", table.concat(my_sleep_map, ", "))
+ end
 
 function sleep_if_throttle()
    my_thread_id = sysbench.tid % sysbench.opt.threads
@@ -54,6 +72,8 @@ end
 sysbench.cmdline.options = {
    qps_weight  =
       {"Weight of QPS workload [1-100]", 100},
+   sleep_window_in_ms  =
+      {"Sleep M ms if rand(1,100) > weight per event (default 15ms)", 15},
    table_size =
       {"Number of rows per table", 10000},
    range_size =
@@ -384,23 +404,7 @@ function thread_init()
    stmt = {}
    param = {}
 
-   math.randomseed(os.time())
-   math.random(); math.random(); math.random()
-
-   my_thread_id = sysbench.tid % sysbench.opt.threads
-   event_cnt[my_thread_id] = 0
-   sleep_vec[my_thread_id] = {}
-   for i = 0,999 do
-      local r = math.random(1,100)
-      local v = 1
-      if r <= sysbench.opt.qps_weight then
-          v = 0
-      end
-      sleep_vec[my_thread_id][i] = v
-   end
-   my_sleep_map = sleep_vec[my_thread_id]
-   print("thread init:", my_thread_id, " weight:", sysbench.opt.qps_weight, "ops_weight_vec:", table.concat(my_sleep_map, ", "))
-
+   init_throttle()
    for t = 1, sysbench.opt.tables do
       stmt[t] = {}
       param[t] = {}
