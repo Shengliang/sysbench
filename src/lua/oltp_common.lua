@@ -42,7 +42,7 @@ function init_throttle()
       sleep_vec[my_thread_id][i] = v
    end
    my_sleep_map = sleep_vec[my_thread_id]
-   print("thread init:", my_thread_id, " weight:", sysbench.opt.qps_weight, "ops_weight_vec:", table.concat(my_sleep_map, ", "))
+   print("thread init:", my_thread_id, " weight:", sysbench.opt.qps_weight, " sleep_window_in_ms:", sysbench.opt.sleep_window_in_ms)
  end
 
 function sleep_if_throttle()
@@ -53,8 +53,10 @@ function sleep_if_throttle()
    if sleep_vec[my_thread_id][cnt%1000] == 1 then
        -- print("S", cnt%1000);
        mysleep(1);
+       return 1
    end
    -- print("event thread_id:", my_thread_id,  " event cnt:", event_cnt[my_thread_id])
+   return 0
 end
 
 function init()

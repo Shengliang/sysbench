@@ -33,7 +33,9 @@ function prepare_statements()
 end
 
 function event()
-   sleep_if_throttle()
+   if sleep_if_throttle() == 1 then
+      return
+   end
    if not sysbench.opt.skip_trx then
       begin()
    end
